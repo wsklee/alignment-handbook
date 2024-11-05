@@ -1,0 +1,65 @@
+# Model arguments
+model_name_or_path: distilbert/distilbert-base-uncased  
+model_revision: main
+tokenizer_name_or_path: distilbert/distilbert-base-uncased 
+torch_dtype: float16
+
+# LoRA arguments
+load_in_4bit: false
+use_peft: true
+lora_r: 16
+lora_alpha: 16
+lora_dropout: 0.05
+lora_target_modules:
+- q_proj
+- k_proj
+- v_proj
+- o_proj
+- gate_proj
+- up_proj
+- down_proj
+
+# Data training arguments
+dataset_mixer:
+  HuggingFaceTB/self-oss-instruct-sc2-H4: 1.0 
+  HuggingFaceTB/everyday-conversations-llama3.1-2k: 1.0 
+  HuggingFaceTB/instruct-data-basics-smollm-H4: 1.0 
+
+dataset_splits:
+- train_sft
+- test_sft
+preprocessing_num_workers: 36
+
+# SFT trainer config
+bf16: false  # DistilBERT typically uses float32 or float16, bf16 is not commonly used.
+dataset_kwargs:
+  add_special_tokens: true  # Use special tokens (e.g., [CLS], [SEP]) for DistilBERT
+  append_concat_token: false  # Not necessary for DistilBERT
+do_eval: true
+evaluation_strategy: epoch
+gradient_accumulation_steps: 4
+gradient_checkpointing: false  # DistilBERT might not require gradient checkpointing
+hub_model_id: distilbert-finetuned-new  # Update the model ID accordingly
+hub_strategy: every_save
+learning_rate: 5e-05  # A typical learning rate for fine-tuning DistilBERT
+log_level: info
+logging_steps: 5
+logging_strategy: steps
+lr_scheduler_type: cosine
+max_seq_length: 512  # DistilBERT has a max sequence length of 512
+max_steps: -1
+num_train_epochs: 3  # more epoch as DistilBERT is smaller
+output_dir: data/distilbert-finetuned-new  # Update output directory
+overwrite_output_dir: true
+per_device_eval_batch_size: 16  
+per_device_train_batch_size: 16  
+push_to_hub: true
+remove_unused_columns: true
+report_to:
+- wandb
+
+save_strategy: epoch
+hub_strategy: every_save
+
+seed: 42
+warmup_ratio: 0.1
