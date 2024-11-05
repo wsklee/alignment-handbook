@@ -124,7 +124,12 @@ def main():
     # For ChatML we need to add special tokens and resize the embedding layer
     if "<|im_start|>" in tokenizer.chat_template and "gemma-tokenizer-chatml" not in tokenizer.name_or_path:
         model = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path, **model_kwargs)
-        model, tokenizer = setup_chat_format(model, tokenizer)
+        # Only setup chat format if it's not already set
+        if not tokenizer.chat_template:
+            model, tokenizer = setup_chat_format(model, tokenizer)
+        else:
+            logger.warning("Chat template is already set in the tokenizer, skipping setup.")
+            
         model_kwargs = None
 
     #####################
