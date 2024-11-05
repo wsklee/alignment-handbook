@@ -31,7 +31,7 @@ gradient_checkpointing_kwargs:
   use_reentrant: false
 hub_model_id: smollm-360M-instruct-new
 hub_strategy: every_save
-learning_rate: 1.0e-03 # 3e-4
+learning_rate: 2.0e-05 # 3e-4
 log_level: info
 logging_steps: 5
 logging_strategy: steps
@@ -46,8 +46,10 @@ per_device_train_batch_size: 4
 push_to_hub: true
 remove_unused_columns: true
 report_to:
-- tensorboard
 - wandb
-save_strategy: "no"
+
+save_strategy: epoch
+hub_strategy: every_save
+
 seed: 42
 warmup_ratio: 0.1
