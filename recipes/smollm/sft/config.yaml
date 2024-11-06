@@ -38,9 +38,9 @@ dataset_kwargs:
 do_eval: true
 evaluation_strategy: epoch
 gradient_accumulation_steps: 4
-gradient_checkpointing: true
-gradient_checkpointing_kwargs:
-  use_reentrant: false
+gradient_checkpointing: false
+#gradient_checkpointing_kwargs:
+#  use_reentrant: false
 hub_model_id: smollm-360M-instruct-new
 hub_strategy: every_save
 learning_rate: 2.0e-05 # 3e-4
