@@ -8,9 +8,6 @@ torch_dtype: float16
 dataset_mixer:
   imdb: 1.0
   sst2: 1.0
-dataset_splits:
-  - train
-  - test
 preprocessing_num_workers: 4
 max_seq_length: 256
 
@@ -35,26 +32,27 @@ lora_target_modules:
   - classifier
 
 # Training config
-bf16: false
+do_train: true
 do_eval: true
-evaluation_strategy: steps
+eval_strategy: steps
 eval_steps: 200
 gradient_accumulation_steps: 4
 gradient_checkpointing: true
-hub_model_id: distilbert-sentiment-dpo
-hub_strategy: every_save
-learning_rate: 5e-6
-log_level: info
+learning_rate: 0.000005 # 5e-6 written as explicit float
 logging_steps: 50
-logging_strategy: steps
 lr_scheduler_type: cosine
 max_steps: 1000
-num_train_epochs: 1
 output_dir: data/distilbert-sentiment-dpo
-overwrite_output_dir: true
+
+# Hub settings
+push_to_hub: true
+hub_model_id: wsklee/distilbert-sentiment-dpo # Replace with your username
+hub_strategy: every_save
+hub_token: null # Will use token from huggingface-cli login
+
+# Training parameters
 per_device_eval_batch_size: 8
 per_device_train_batch_size: 8
-push_to_hub: false
 remove_unused_columns: true
 report_to:
   - wandb

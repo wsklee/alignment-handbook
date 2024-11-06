@@ -24,7 +24,7 @@ from transformers import (
 import evaluate
 
 from alignment.configs import ModelArguments
-from alignment.model_utils import get_checkpoint, get_tokenizer
+from alignment.model_utils import get_checkpoint
 
 logger = logging.getLogger(__name__)
 
@@ -70,27 +70,30 @@ def main():
             dataset = load_dataset("glue", "sst2")
         raw_datasets[dataset_name] = dataset
 
-    # Load tokenizer & model
-    tokenizer = get_tokenizer(model_args)
+    # Load tokenizer
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_args.tokenizer_name_or_path or model_args.model_name_or_path,
+        revision=model_args.model_revision,
+        use_fast=True,
+    )
+
+    # Load model
     model = AutoModelForSequenceClassification.from_pretrained(
         model_args.model_name_or_path,
-        num_labels=2,  # Binary classification
         revision=model_args.model_revision,
+        num_labels=2,  # Binary classification
     )
 
     # Preprocessing function
     def preprocess_function(examples):
         # For SST-2 the text field is "sentence", for IMDB it's "text"
         texts = examples.get("sentence", examples.get("text", []))
-        result = tokenizer(
+        return tokenizer(
             texts,
             padding=False,
             max_length=data_args.max_seq_length,
             truncation=True,
         )
-        if "label" in examples:
-            result["labels"] = examples["label"]
-        return result
 
     # Process datasets
     processed_datasets = {}
@@ -103,7 +106,7 @@ def main():
             desc=f"Processing {name} dataset",
         )
 
-    # Combine datasets according to mixing weights
+    # Combine datasets
     train_datasets = []
     eval_datasets = []
     for name, weight in data_args.dataset_mixer.items():
