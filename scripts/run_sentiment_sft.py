@@ -48,19 +48,19 @@ class DataTrainingArguments:
 @dataclass
 class SFTConfig(TrainingArguments):
     """Arguments for SFT training that extend the base TrainingArguments"""
-    lora_r: int = field(
+    peft_lora_r: int = field(
         default=8,
         metadata={"help": "Lora R dimension"}
     )
-    lora_alpha: int = field(
+    peft_lora_alpha: int = field(
         default=16,
         metadata={"help": "Lora alpha"}
     )
-    lora_dropout: float = field(
+    peft_lora_dropout: float = field(
         default=0.1,
         metadata={"help": "Lora dropout"}
     )
-    lora_target_modules: List[str] = field(
+    peft_lora_modules: List[str] = field(
         default_factory=lambda: ["q_lin", "k_lin", "v_lin", "out_lin", "ffn.lin1", "ffn.lin2"],
         metadata={"help": "List of module names to apply Lora to"}
     )
@@ -110,10 +110,10 @@ def main():
         peft_config = LoraConfig(
             task_type=TaskType.SEQ_CLS,
             inference_mode=False,
-            r=training_args.lora_r,
-            lora_alpha=training_args.lora_alpha,
-            lora_dropout=training_args.lora_dropout,
-            target_modules=training_args.lora_target_modules,
+            r=training_args.peft_lora_r,
+            lora_alpha=training_args.peft_lora_alpha,
+            lora_dropout=training_args.peft_lora_dropout,
+            target_modules=training_args.peft_lora_modules,
         )
         model = get_peft_model(model, peft_config)
         model.print_trainable_parameters()
@@ -195,4 +195,4 @@ def main():
         trainer.save_metrics("eval", metrics)
 
 if __name__ == "__main__":
-    main() 
+    main()

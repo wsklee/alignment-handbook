@@ -12,12 +12,11 @@ preprocessing_num_workers: 4
 max_seq_length: 256
 
 # LoRA arguments
-load_in_4bit: true
 use_peft: true
-lora_r: 4
-lora_alpha: 16
-lora_dropout: 0.1
-lora_target_modules:
+peft_lora_r: 4
+peft_lora_alpha: 16
+peft_lora_dropout: 0.1
+peft_lora_modules:
   - q_lin
   - k_lin
   - v_lin
@@ -34,7 +33,7 @@ eval_strategy: steps
 eval_steps: 200
 gradient_accumulation_steps: 4
 gradient_checkpointing: true
-learning_rate: 0.00005 # 5e-5 written as explicit float
+learning_rate: 0.00005 # 5e-5 as explicit float
 logging_steps: 50
 lr_scheduler_type: cosine
 max_steps: 1500
