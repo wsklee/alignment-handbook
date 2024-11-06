@@ -5,7 +5,7 @@ import logging
 import os
 import sys
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, List
 
 import datasets
 import numpy as np
@@ -33,10 +33,6 @@ class DataTrainingArguments:
     dataset_mixer: Optional[dict] = field(
         default_factory=dict,
         metadata={"help": "Dictionary of dataset names and their mixing weights"}
-    )
-    dataset_splits: Optional[list] = field(  # Add this field
-        default_factory=lambda: ["train", "test"],
-        metadata={"help": "List of dataset splits to use"}
     )
     max_seq_length: Optional[int] = field(
         default=512,
@@ -109,7 +105,7 @@ def main():
             desc=f"Processing {name} dataset",
         )
 
-    # Combine datasets according to mixing weights
+    # Combine datasets
     train_datasets = []
     eval_datasets = []
     for name, weight in data_args.dataset_mixer.items():
