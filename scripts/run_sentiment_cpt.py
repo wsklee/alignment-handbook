@@ -34,6 +34,10 @@ class DataTrainingArguments:
         default_factory=dict,
         metadata={"help": "Dictionary of dataset names and their mixing weights"}
     )
+    dataset_splits: Optional[list] = field(  # Add this field
+        default_factory=lambda: ["train", "test"],
+        metadata={"help": "List of dataset splits to use"}
+    )
     max_seq_length: Optional[int] = field(
         default=512,
         metadata={"help": "Maximum sequence length to use"}
