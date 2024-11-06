@@ -5,7 +5,7 @@ import logging
 import os
 import sys
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, List
 
 import datasets
 import numpy as np
@@ -22,6 +22,7 @@ from transformers import (
     set_seed,
 )
 import evaluate
+from peft import LoraConfig, get_peft_model, TaskType
 
 from alignment.configs import ModelArguments
 from alignment.model_utils import get_checkpoint
@@ -44,8 +45,31 @@ class DataTrainingArguments:
         metadata={"help": "Number of workers for preprocessing"}
     )
 
+@dataclass
+class SFTConfig(TrainingArguments):
+    use_peft: bool = field(
+        default=False,
+        metadata={"help": "Whether to use PEFT or not"}
+    )
+    lora_r: int = field(
+        default=8,
+        metadata={"help": "Lora R dimension"}
+    )
+    lora_alpha: int = field(
+        default=16,
+        metadata={"help": "Lora alpha"}
+    )
+    lora_dropout: float = field(
+        default=0.1,
+        metadata={"help": "Lora dropout"}
+    )
+    lora_target_modules: List[str] = field(
+        default_factory=lambda: ["q_lin", "k_lin", "v_lin", "out_lin", "ffn.lin1", "ffn.lin2"],
+        metadata={"help": "List of module names to apply Lora to"}
+    )
+
 def main():
-    parser = HfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments))
+    parser = HfArgumentParser((ModelArguments, DataTrainingArguments, SFTConfig))
     if len(sys.argv) == 2 and sys.argv[1].endswith(".yaml"):
         model_args, data_args, training_args = parser.parse_yaml_file(yaml_file=os.path.abspath(sys.argv[1]))
     else:
@@ -84,16 +108,33 @@ def main():
         num_labels=2,  # Binary classification
     )
 
+    # Configure LoRA if enabled
+    if training_args.use_peft:
+        peft_config = LoraConfig(
+            task_type=TaskType.SEQ_CLS,  # Sequence Classification
+            inference_mode=False,
+            r=training_args.lora_r,
+            lora_alpha=training_args.lora_alpha,
+            lora_dropout=training_args.lora_dropout,
+            target_modules=training_args.lora_target_modules,
+        )
+        model = get_peft_model(model, peft_config)
+        model.print_trainable_parameters()
+
     # Preprocessing function
     def preprocess_function(examples):
         # For SST-2 the text field is "sentence", for IMDB it's "text"
         texts = examples.get("sentence", examples.get("text", []))
-        return tokenizer(
+        result = tokenizer(
             texts,
             padding=False,
             max_length=data_args.max_seq_length,
             truncation=True,
         )
+        
+        # Add labels
+        result["labels"] = examples["label"]
+        return result
 
     # Process datasets
     processed_datasets = {}
