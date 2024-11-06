@@ -35,7 +35,7 @@ eval_strategy: steps
 eval_steps: 200
 gradient_accumulation_steps: 4
 gradient_checkpointing: true
-learning_rate: 1e-4
+learning_rate: 0.0001
 logging_steps: 50
 lr_scheduler_type: cosine
 max_steps: 1000
@@ -43,7 +43,7 @@ output_dir: data/distilbert-sentiment-cpt
 
 # Hub settings
 push_to_hub: true
-hub_model_id: your-username/distilbert-sentiment-cpt # Replace with your username
+hub_model_id: wsklee/distilbert-sentiment-cpt # Replace with your username
 hub_strategy: every_save
 hub_token: null # Will use token from huggingface-cli login
 
