@@ -47,10 +47,7 @@ class DataTrainingArguments:
 
 @dataclass
 class SFTConfig(TrainingArguments):
-    use_peft: bool = field(
-        default=False,
-        metadata={"help": "Whether to use PEFT or not"}
-    )
+    """Arguments for SFT training that extend the base TrainingArguments"""
     lora_r: int = field(
         default=8,
         metadata={"help": "Lora R dimension"}
@@ -109,9 +106,9 @@ def main():
     )
 
     # Configure LoRA if enabled
-    if training_args.use_peft:
+    if hasattr(training_args, "use_peft") and training_args.use_peft:
         peft_config = LoraConfig(
-            task_type=TaskType.SEQ_CLS,  # Sequence Classification
+            task_type=TaskType.SEQ_CLS,
             inference_mode=False,
             r=training_args.lora_r,
             lora_alpha=training_args.lora_alpha,
