@@ -76,8 +76,14 @@ def main():
             dataset = load_dataset("glue", "sst2")
         raw_datasets[dataset_name] = dataset
 
-    # Load tokenizer & model
-    tokenizer = get_tokenizer(model_args)
+    # Load tokenizer
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_args.tokenizer_name_or_path or model_args.model_name_or_path,
+        revision=model_args.model_revision,
+        use_fast=True,
+    )
+
+    # Load model
     model = AutoModelForMaskedLM.from_pretrained(
         model_args.model_name_or_path,
         revision=model_args.model_revision,
