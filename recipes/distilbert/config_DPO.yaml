@@ -1,0 +1,64 @@
+# Model arguments
+model_name_or_path: distilbert/distilbert-base-uncased # Path to your SFT model
+model_revision: main
+tokenizer_name_or_path: distilbert/distilbert-base-uncased
+torch_dtype: float16
+
+# Data training arguments
+dataset_mixer:
+  imdb: 1.0
+  sst2: 1.0
+dataset_splits:
+  - train
+  - test
+preprocessing_num_workers: 4
+max_seq_length: 256
+
+# DPO specific settings
+beta: 0.1
+reference_model: data/distilbert-sentiment-sft # Your SFT model as reference
+
+# LoRA arguments
+load_in_4bit: true
+use_peft: true
+lora_r: 4
+lora_alpha: 16
+lora_dropout: 0.1
+lora_target_modules:
+  - q_lin
+  - k_lin
+  - v_lin
+  - out_lin
+  - ffn.lin1
+  - ffn.lin2
+  - pre_classifier
+  - classifier
+
+# Training config
+bf16: false
+do_eval: true
+evaluation_strategy: steps
+eval_steps: 200
+gradient_accumulation_steps: 4
+gradient_checkpointing: true
+hub_model_id: distilbert-sentiment-dpo
+hub_strategy: every_save
+learning_rate: 5e-6
+log_level: info
+logging_steps: 50
+logging_strategy: steps
+lr_scheduler_type: cosine
+max_steps: 1000
+num_train_epochs: 1
+output_dir: data/distilbert-sentiment-dpo
+overwrite_output_dir: true
+per_device_eval_batch_size: 8
+per_device_train_batch_size: 8
+push_to_hub: false
+remove_unused_columns: true
+report_to:
+  - wandb
+save_strategy: steps
+save_steps: 200
+seed: 42
+warmup_ratio: 0.1
