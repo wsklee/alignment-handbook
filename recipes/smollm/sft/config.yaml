@@ -4,11 +4,24 @@ model_revision: main
 tokenizer_name_or_path: HuggingFaceTB/SmolLM-360M-Instruct # Custom tokenizer with <|im_start|> and <|im_end|> tokens
 torch_dtype: bfloat16
 
+# LoRA arguments
+load_in_4bit: true
+use_peft: true
+lora_r: 16
+lora_alpha: 16
+lora_dropout: 0.05
+lora_target_modules:
+- q_proj
+- k_proj
+- v_proj
+- o_proj
+- gate_proj
+- up_proj
+- down_proj
+
 # Data training arguments
 dataset_mixer:
-  HuggingFaceTB/Magpie-Pro-300K-Filtered-H4: 1.0 
   HuggingFaceTB/self-oss-instruct-sc2-H4: 1.0 
-  HuggingFaceTB/OpenHermes-2.5-H4: 0.001 
   HuggingFaceTB/everyday-conversations-llama3.1-2k: 1.0 
   HuggingFaceTB/instruct-data-basics-smollm-H4: 1.0 
 
@@ -35,7 +48,7 @@ log_level: info
 logging_steps: 5
 logging_strategy: steps
 lr_scheduler_type: cosine
-max_seq_length: 2048
+max_seq_length: 1024
 max_steps: -1
 num_train_epochs: 1
 output_dir: data/smollm-360M-instruct-new
