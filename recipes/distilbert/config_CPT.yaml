@@ -8,17 +8,17 @@ torch_dtype: float16
 dataset_mixer:
   imdb: 1.0
   sst2: 1.0
-preprocessing_num_workers: 4
-max_seq_length: 256
+preprocessing_num_workers: 8
+max_seq_length: 512
 
 # CPT specific settings
 mlm_probability: 0.15
 
 # LoRA arguments
-load_in_4bit: true
 use_peft: true
-lora_r: 4
-lora_alpha: 16
+load_in_4bit: true
+lora_r: 8
+lora_alpha: 32
 lora_dropout: 0.1
 lora_target_modules:
   - q_lin
@@ -31,29 +31,35 @@ lora_target_modules:
 # Training config
 do_train: true
 do_eval: true
-eval_strategy: steps
-eval_steps: 200
-gradient_accumulation_steps: 4
-gradient_checkpointing: true
-learning_rate: 0.0001
-logging_steps: 50
-lr_scheduler_type: cosine
-max_steps: 1000
-output_dir: data/distilbert-sentiment-cpt
+eval_strategy: "epoch"
+num_train_epochs: 5
+max_steps: -1
+gradient_accumulation_steps: 1
+gradient_checkpointing: false
+learning_rate: 0.0005
+weight_decay: 0.01
+logging_steps: 100
 
-# Hub settings
+# Optimizer settings
+optim: adamw_torch
+lr_scheduler_type: cosine
+warmup_ratio: 0.05
+
+# Training parameters
+per_device_train_batch_size: 256
+per_device_eval_batch_size: 512
+remove_unused_columns: true
+seed: 42
+
+# Save settings
+save_strategy: "epoch"
+save_total_limit: 2
 push_to_hub: true
 hub_model_id: wsklee/distilbert-sentiment-cpt
 hub_strategy: every_save
 hub_token: null # Will use token from huggingface-cli login
+output_dir: data/distilbert-sentiment-cpt
 
-# Training parameters
-per_device_eval_batch_size: 8
-per_device_train_batch_size: 8
-remove_unused_columns: true
+# Reporting
 report_to:
   - wandb
-save_strategy: steps
-save_steps: 200
-seed: 42
-warmup_ratio: 0.1
