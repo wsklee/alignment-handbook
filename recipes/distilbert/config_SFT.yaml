@@ -9,7 +9,7 @@ dataset_mixer:
   imdb: 1.0
   sst2: 1.0
 preprocessing_num_workers: 8
-max_seq_length: 384
+max_seq_length: 256
 
 # LoRA arguments
 use_peft: true
@@ -29,14 +29,14 @@ peft_lora_modules:
 # Training config
 do_train: true
 do_eval: true
-eval_strategy: "epoch"
-num_train_epochs: 3
+eval_strategy: "steps"
+num_train_epochs: 2
 max_steps: -1 # Run for full epochs
 gradient_accumulation_steps: 1
 gradient_checkpointing: false
 learning_rate: 0.0003 # Increased for faster convergence
 weight_decay: 0.01
-logging_steps: 100
+logging_steps: 200
 
 # Optimizer settings
 optim: adamw_torch
@@ -50,7 +50,8 @@ remove_unused_columns: true
 seed: 42
 
 # Save settings
-save_strategy: "epoch"
+save_strategy: "steps"
+save_steps: 1000
 save_total_limit: 2
 push_to_hub: true
 hub_model_id: wsklee/distilbert-sentiment-sft
