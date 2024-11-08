@@ -5,10 +5,11 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python>=3.10.9
+  - python=3.10
   - pytorch>=2.1.2
   - pytorch-cuda=12.1
   - pip
+  - scikit-learn
   - pip:
       # Core dependencies
       - accelerate>=0.29.2
