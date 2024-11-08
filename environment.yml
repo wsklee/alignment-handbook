@@ -1,0 +1,42 @@
+name: alignment-handbook
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.10.9
+  - pytorch>=2.1.2
+  - pytorch-cuda=12.1
+  - pip
+  - pip:
+      # Core dependencies
+      - accelerate>=0.29.2
+      - bitsandbytes>=0.43.0
+      - einops>=0.6.1
+      - evaluate==0.4.0
+      - datasets>=2.18.0
+      - deepspeed>=0.14.4
+      - hf_transfer>=0.1.4
+      - huggingface-hub>=0.19.2,<1.0
+      - jinja2>=3.0.0
+      - ninja>=1.11.1
+      - numpy>=1.24.2
+      - packaging>=23.0
+      - peft>=0.9.0
+      - protobuf<=3.20.2
+      - safetensors>=0.3.3
+      - sentencepiece>=0.1.99
+      - scipy
+      - tensorboard
+      - transformers>=4.39.3
+      - trl>=0.9.6
+      - tqdm>=4.64.1
+      # Quality & testing dependencies
+      - black>=24.4.2
+      - flake8>=6.0.0
+      - isort>=5.12.0
+      - pytest
+      - parameterized>=0.9.0
+      # Additional tools
+      - wandb # For experiment tracking

@@ -1,5 +1,5 @@
 # Model arguments
-model_name_or_path: distilbert/distilbert-base-uncased # Path to your SFT model
+model_name_or_path: distilbert/distilbert-base-uncased
 model_revision: main
 tokenizer_name_or_path: distilbert/distilbert-base-uncased
 torch_dtype: float16
@@ -13,7 +13,7 @@ max_seq_length: 256
 
 # DPO specific settings
 beta: 0.1
-reference_model: data/distilbert-sentiment-sft # Your SFT model as reference
+reference_model: data/distilbert-sentiment-sft
 
 # LoRA arguments
 load_in_4bit: true
@@ -46,7 +46,7 @@ output_dir: data/distilbert-sentiment-dpo
 
 # Hub settings
 push_to_hub: true
-hub_model_id: wsklee/distilbert-sentiment-dpo # Replace with your username
+hub_model_id: wsklee/distilbert-sentiment-dpo
 hub_strategy: every_save
 hub_token: null # Will use token from huggingface-cli login
 

@@ -1,5 +1,5 @@
 # Model arguments
-model_name_or_path: distilbert/distilbert-base-uncased # Path to your CPT model
+model_name_or_path: distilbert/distilbert-base-uncased
 model_revision: main
 tokenizer_name_or_path: distilbert/distilbert-base-uncased
 torch_dtype: float16
@@ -41,7 +41,7 @@ output_dir: data/distilbert-sentiment-sft
 
 # Hub settings
 push_to_hub: true
-hub_model_id: wsklee/distilbert-sentiment-sft # Replace with your username
+hub_model_id: wsklee/distilbert-sentiment-sft
 hub_strategy: every_save
 hub_token: null # Will use token from huggingface-cli login
 
