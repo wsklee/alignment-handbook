@@ -180,8 +180,7 @@ def main():
 
     # Training
     if training_args.do_train:
-        checkpoint = get_checkpoint(training_args)
-        train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        train_result = trainer.train()
         trainer.save_model()
         trainer.log_metrics("train", train_result.metrics)
         trainer.save_metrics("train", train_result.metrics)

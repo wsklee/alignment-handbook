@@ -18,8 +18,8 @@ mlm_probability: 0.15
 use_peft: true
 load_in_4bit: true
 lora_r: 4
-lora_alpha: 16
-lora_dropout: 0.1
+lora_alpha: 8 # Lowered for more stable adaptation
+lora_dropout: 0.2 # Increased to improve regularization
 lora_target_modules:
   - q_lin
   - k_lin
@@ -32,22 +32,29 @@ lora_target_modules:
 do_train: true
 do_eval: true
 eval_strategy: "steps"
-num_train_epochs: 3
+eval_steps: 1000 # Less frequent to save resources
+
+num_train_epochs: 5 # Increased epochs to allow for early stopping
 max_steps: -1
-gradient_accumulation_steps: 1
-gradient_checkpointing: false
-learning_rate: 0.0005
-weight_decay: 0.01
-logging_steps: 200
+gradient_accumulation_steps: 2 # Increases effective batch size while lowering memory usage
+gradient_checkpointing: true # Enabled to help with memory management
+learning_rate: 0.0001 # Lowered for better stability with large batch sizes
+weight_decay: 0.02 # Increased for better generalization
+logging_steps: 500 # Adjusted to reduce verbosity
+
+# Early stopping (added to avoid overfitting)
+early_stopping_patience: 3 # Stop after 3 evaluations without improvement
+early_stopping_threshold: 0.01 # Minimum improvement threshold
+load_best_model_at_end: true
 
 # Optimizer settings
 optim: adamw_torch
 lr_scheduler_type: cosine
-warmup_ratio: 0.05
+warmup_ratio: 0.1 # Increased warmup to improve stability during initial training phase
 
 # Training parameters
-per_device_train_batch_size: 256
-per_device_eval_batch_size: 512
+per_device_train_batch_size: 128 # Reduced to keep memory within limits when accumulating gradients
+per_device_eval_batch_size: 256
 remove_unused_columns: true
 seed: 42
 

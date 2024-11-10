@@ -5,12 +5,11 @@ import logging
 import os
 import sys
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, List
 
 import datasets
 import numpy as np
 import torch
-import torch.nn.functional as F
 from datasets import load_dataset
 from transformers import (
     AutoConfig,
@@ -21,8 +20,10 @@ from transformers import (
     Trainer,
     TrainingArguments,
     set_seed,
+    EarlyStoppingCallback,
 )
 import evaluate
+from peft import LoraConfig, get_peft_model, TaskType
 
 from alignment.configs import ModelArguments
 from alignment.model_utils import get_checkpoint
@@ -31,6 +32,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class DataTrainingArguments:
+    """Arguments for dataset configuration"""
     dataset_mixer: Optional[dict] = field(
         default_factory=dict,
         metadata={"help": "Dictionary of dataset names and their mixing weights"}
@@ -46,43 +48,61 @@ class DataTrainingArguments:
 
 @dataclass
 class CFTConfig(TrainingArguments):
+    """Arguments for CFT training that extend the base TrainingArguments"""
     temperature: float = field(
         default=0.07,
-        metadata={"help": "Temperature parameter for contrastive loss"}
+        metadata={"help": "Temperature for contrastive loss"}
+    )
+    peft_lora_r: int = field(
+        default=8,
+        metadata={"help": "Lora R dimension"}
+    )
+    peft_lora_alpha: int = field(
+        default=16,
+        metadata={"help": "Lora alpha"}
+    )
+    peft_lora_dropout: float = field(
+        default=0.1,
+        metadata={"help": "Lora dropout"}
+    )
+    peft_lora_modules: List[str] = field(
+        default_factory=lambda: ["q_lin", "k_lin", "v_lin", "out_lin", "ffn.lin1", "ffn.lin2"],
+        metadata={"help": "List of module names to apply Lora to"}
+    )
+    early_stopping_patience: int = field(
+        default=3,
+        metadata={"help": "Number of epochs to wait before early stopping"}
+    )
+    early_stopping_threshold: float = field(
+        default=0.0,
+        metadata={"help": "How much the metric must improve to be considered as improved"}
     )
 
-class SentimentCFTTrainer(Trainer):
-    def __init__(self, temperature=0.07, **kwargs):
-        super().__init__(**kwargs)
-        self.temperature = temperature
-
-    def compute_loss(self, model, inputs, return_outputs=False):
-        # Get embeddings and labels
-        outputs = model(**inputs, output_hidden_states=True)
-        hidden_states = outputs.hidden_states[-1][:, 0, :]  # Use [CLS] token embedding
-        labels = inputs.pop("labels")
+class ContrastiveTrainer(Trainer):
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
+        outputs = model(**inputs)
+        logits = outputs.logits
+        labels = inputs["labels"]
         
-        # Normalize embeddings
-        embeddings = F.normalize(hidden_states, p=2, dim=1)
+        batch_size = logits.size(0)
+        temperature = self.args.temperature
         
-        # Compute similarity matrix
-        similarity_matrix = torch.matmul(embeddings, embeddings.T) / self.temperature
+        normalized_logits = torch.nn.functional.normalize(logits, dim=1)
+        sim_matrix = torch.matmul(normalized_logits, normalized_logits.t()) / temperature
         
-        # Create masks for positive and negative pairs
-        batch_size = labels.shape[0]
         labels_matrix = labels.unsqueeze(0) == labels.unsqueeze(1)
-        mask_positives = labels_matrix.float() - torch.eye(batch_size, device=labels.device)
-        mask_negatives = ~labels_matrix
+        labels_matrix = labels_matrix.float()
         
-        # Compute contrastive loss
-        exp_similarities = torch.exp(similarity_matrix)
-        positives = torch.sum(exp_similarities * mask_positives, dim=1)
-        negatives = torch.sum(exp_similarities * mask_negatives, dim=1)
-        loss = -torch.log(positives / (positives + negatives)).mean()
+        mask = torch.eye(batch_size, dtype=torch.bool, device=logits.device)
+        labels_matrix = labels_matrix.masked_fill(mask, 0)
         
-        if return_outputs:
-            return loss, outputs
-        return loss
+        exp_sim = torch.exp(sim_matrix)
+        log_prob = sim_matrix - torch.log(exp_sim.sum(dim=1, keepdim=True))
+        
+        loss = (-labels_matrix * log_prob).sum(dim=1) / labels_matrix.sum(dim=1).clamp(min=1)
+        loss = loss.mean()
+        
+        return (loss, outputs) if return_outputs else loss
 
 def main():
     parser = HfArgumentParser((ModelArguments, DataTrainingArguments, CFTConfig))
@@ -110,21 +130,36 @@ def main():
             dataset = load_dataset("glue", "sst2")
         raw_datasets[dataset_name] = dataset
 
-    # Load tokenizer and model
+    # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.tokenizer_name_or_path or model_args.model_name_or_path,
         revision=model_args.model_revision,
         use_fast=True,
     )
 
+    # Load model
     model = AutoModelForSequenceClassification.from_pretrained(
         model_args.model_name_or_path,
         revision=model_args.model_revision,
-        num_labels=2,
+        num_labels=2,  # Binary classification
     )
+
+    # Configure LoRA if enabled
+    if hasattr(training_args, "use_peft") and training_args.use_peft:
+        peft_config = LoraConfig(
+            task_type=TaskType.SEQ_CLS,
+            inference_mode=False,
+            r=training_args.peft_lora_r,
+            lora_alpha=training_args.peft_lora_alpha,
+            lora_dropout=training_args.peft_lora_dropout,
+            target_modules=training_args.peft_lora_modules,
+        )
+        model = get_peft_model(model, peft_config)
+        model.print_trainable_parameters()
 
     # Preprocessing function
     def preprocess_function(examples):
+        # For SST-2 the text field is "sentence", for IMDB it's "text"
         texts = examples.get("sentence", examples.get("text", []))
         result = tokenizer(
             texts,
@@ -132,11 +167,12 @@ def main():
             max_length=data_args.max_seq_length,
             truncation=True,
         )
-        if "label" in examples:
-            result["labels"] = examples["label"]
+        
+        # Add labels
+        result["labels"] = examples["label"]
         return result
 
-    # Process and combine datasets
+    # Process datasets
     processed_datasets = {}
     for name, dataset in raw_datasets.items():
         processed_datasets[name] = dataset.map(
@@ -147,6 +183,7 @@ def main():
             desc=f"Processing {name} dataset",
         )
 
+    # Combine datasets
     train_datasets = []
     eval_datasets = []
     for name, weight in data_args.dataset_mixer.items():
@@ -159,18 +196,27 @@ def main():
     train_dataset = datasets.concatenate_datasets(train_datasets)
     eval_dataset = datasets.concatenate_datasets(eval_datasets)
 
-    # Data collator and metrics
+    # Data collator
     data_collator = DataCollatorWithPadding(tokenizer)
-    metric = evaluate.load("accuracy")
 
+    # Metrics
+    metric = evaluate.load("accuracy")
     def compute_metrics(eval_pred):
         predictions, labels = eval_pred
         predictions = np.argmax(predictions, axis=1)
         return metric.compute(predictions=predictions, references=labels)
 
-    # Initialize trainer
-    trainer = SentimentCFTTrainer(
-        temperature=training_args.temperature,
+    # Initialize callbacks list
+    callbacks = []
+    if training_args.early_stopping_patience > 0:
+        early_stopping_callback = EarlyStoppingCallback(
+            early_stopping_patience=training_args.early_stopping_patience,
+            early_stopping_threshold=training_args.early_stopping_threshold,
+        )
+        callbacks.append(early_stopping_callback)
+
+    # Initialize ContrastiveTrainer
+    trainer = ContrastiveTrainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset,
@@ -178,12 +224,12 @@ def main():
         tokenizer=tokenizer,
         data_collator=data_collator,
         compute_metrics=compute_metrics,
+        callbacks=callbacks,
     )
 
     # Training
     if training_args.do_train:
-        checkpoint = get_checkpoint(training_args)
-        train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        train_result = trainer.train()
         trainer.save_model()
         trainer.log_metrics("train", train_result.metrics)
         trainer.save_metrics("train", train_result.metrics)
@@ -197,4 +243,4 @@ def main():
         trainer.save_metrics("eval", metrics)
 
 if __name__ == "__main__":
-    main() 
+    main()

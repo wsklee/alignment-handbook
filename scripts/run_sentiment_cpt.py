@@ -5,7 +5,7 @@ import logging
 import os
 import sys
 from dataclasses import dataclass, field
-from typing import Optional, List
+from typing import Optional
 
 import datasets
 import numpy as np
@@ -20,6 +20,7 @@ from transformers import (
     Trainer,
     TrainingArguments,
     set_seed,
+    EarlyStoppingCallback,  # Import the EarlyStoppingCallback
 )
 
 from alignment.configs import ModelArguments
@@ -48,6 +49,14 @@ class CPTConfig(TrainingArguments):
     mlm_probability: float = field(
         default=0.15,
         metadata={"help": "Ratio of tokens to mask for MLM"}
+    )
+    early_stopping_patience: int = field(
+        default=3,
+        metadata={"help": "Number of evaluation calls with no improvement to stop training"}
+    )
+    early_stopping_threshold: float = field(
+        default=0.01,
+        metadata={"help": "Minimum threshold for improvement to continue training"}
     )
 
 def main():
@@ -131,19 +140,22 @@ def main():
         mlm_probability=training_args.mlm_probability,
     )
 
-    # Initialize Trainer
+    # Initialize Trainer with EarlyStoppingCallback
     trainer = Trainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         data_collator=data_collator,
+        callbacks=[EarlyStoppingCallback(
+            early_stopping_patience=training_args.early_stopping_patience,
+            early_stopping_threshold=training_args.early_stopping_threshold,
+        )],
     )
 
     # Training
     if training_args.do_train:
-        checkpoint = get_checkpoint(training_args)
-        train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        train_result = trainer.train()
         trainer.save_model()
         trainer.log_metrics("train", train_result.metrics)
         trainer.save_metrics("train", train_result.metrics)
@@ -157,4 +169,4 @@ def main():
         trainer.save_metrics("eval", metrics)
 
 if __name__ == "__main__":
-    main() 
+    main()
