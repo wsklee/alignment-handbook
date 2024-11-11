@@ -26,7 +26,7 @@ import evaluate
 from peft import LoraConfig, get_peft_model, TaskType
 
 from alignment.configs import ModelArguments
-from alignment.model_utils import get_checkpoint
+from alignment.preprocessing import preprocess_function
 
 logger = logging.getLogger(__name__)
 
@@ -79,30 +79,91 @@ class CFTConfig(TrainingArguments):
     )
 
 class ContrastiveTrainer(Trainer):
+    
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
-        outputs = model(**inputs)
-        logits = outputs.logits
-        labels = inputs["labels"]
+        # Create input dicts
+        sequence_1_inputs = {k: v for k, v in inputs.items() 
+                           if not k.endswith('_pair') and k != 'labels'}
+        sequence_2_inputs = {k.replace('_pair', ''): v for k, v in inputs.items() 
+                           if k.endswith('_pair')}
         
-        batch_size = logits.size(0)
+        print("DEBUG - sequence_1_inputs keys:", sequence_1_inputs.keys())
+        print("DEBUG - sequence_2_inputs keys:", sequence_2_inputs.keys())
+        
+        outputs_1 = model(**sequence_1_inputs)
+        outputs_2 = model(**sequence_2_inputs)
+        
+        # Get embeddings for both sequences
+        embeddings_1 = outputs_1.logits
+        embeddings_2 = outputs_2.logits
+        
+        # Normalize embeddings
+        embeddings_1 = torch.nn.functional.normalize(embeddings_1, dim=1)
+        embeddings_2 = torch.nn.functional.normalize(embeddings_2, dim=1)
+        
+        # Compute similarity scores
+        similarity = torch.sum(embeddings_1 * embeddings_2, dim=1)
+        
+        # Get labels
+        labels = inputs["labels"].float()
+        
+        # Compute contrastive loss
         temperature = self.args.temperature
+        loss = torch.mean((1 - labels) * torch.square(similarity) + 
+                         labels * torch.square(torch.clamp(1 - similarity, min=0.0)))
         
-        normalized_logits = torch.nn.functional.normalize(logits, dim=1)
-        sim_matrix = torch.matmul(normalized_logits, normalized_logits.t()) / temperature
+        if return_outputs:
+            return loss, {'logits': similarity}
+        return loss
+
+# Create a custom data collator that handles paired sequences
+class ContrastiveDataCollator:
+    def __init__(self, tokenizer):
+        self.tokenizer = tokenizer
+        self.default_collator = DataCollatorWithPadding(tokenizer)
+    
+    def __call__(self, features):
+        print("DEBUG - Raw features keys:", features[0].keys())  # More specific debug print
         
-        labels_matrix = labels.unsqueeze(0) == labels.unsqueeze(1)
-        labels_matrix = labels_matrix.float()
+        # Separate features into first and second sequences
+        batch_1 = []
+        batch_2 = []
+        for f in features:
+            # First sequence
+            item1 = {
+                'input_ids': f['input_ids'],
+                'attention_mask': f['attention_mask']
+            }
+            # Second sequence - add error handling
+            try:
+                item2 = {
+                    'input_ids': f['input_ids_pair'],
+                    'attention_mask': f['attention_mask_pair']
+                }
+            except KeyError as e:
+                print(f"DEBUG - Missing key in features: {e}")
+                print(f"DEBUG - Available keys: {f.keys()}")
+                raise KeyError(f"Missing paired sequence keys. Expected 'input_ids_pair' and 'attention_mask_pair', got keys: {f.keys()}")
+            
+            batch_1.append(item1)
+            batch_2.append(item2)
         
-        mask = torch.eye(batch_size, dtype=torch.bool, device=logits.device)
-        labels_matrix = labels_matrix.masked_fill(mask, 0)
+        # Collate each batch separately
+        collated_1 = self.default_collator(batch_1)
+        collated_2 = self.default_collator(batch_2)
         
-        exp_sim = torch.exp(sim_matrix)
-        log_prob = sim_matrix - torch.log(exp_sim.sum(dim=1, keepdim=True))
+        # Combine results
+        final_batch = {}
+        for k, v in collated_1.items():
+            final_batch[k] = v
+            final_batch[f"{k}_pair"] = collated_2[k]
         
-        loss = (-labels_matrix * log_prob).sum(dim=1) / labels_matrix.sum(dim=1).clamp(min=1)
-        loss = loss.mean()
+        # Add labels
+        if features and "labels" in features[0]:
+            final_batch["labels"] = torch.tensor([f["labels"] for f in features])
         
-        return (loss, outputs) if return_outputs else loss
+        print("DEBUG - Final batch keys:", final_batch.keys())
+        return final_batch
 
 def main():
     parser = HfArgumentParser((ModelArguments, DataTrainingArguments, CFTConfig))
@@ -157,31 +218,23 @@ def main():
         model = get_peft_model(model, peft_config)
         model.print_trainable_parameters()
 
-    # Preprocessing function
-    def preprocess_function(examples):
-        # For SST-2 the text field is "sentence", for IMDB it's "text"
-        texts = examples.get("sentence", examples.get("text", []))
-        result = tokenizer(
-            texts,
-            padding=False,
-            max_length=data_args.max_seq_length,
-            truncation=True,
-        )
-        
-        # Add labels
-        result["labels"] = examples["label"]
-        return result
 
     # Process datasets
     processed_datasets = {}
     for name, dataset in raw_datasets.items():
         processed_datasets[name] = dataset.map(
-            preprocess_function,
+            lambda examples: preprocess_function(examples, tokenizer, data_args.max_seq_length),
             batched=True,
             num_proc=data_args.preprocessing_num_workers,
             remove_columns=dataset["train"].column_names,
             desc=f"Processing {name} dataset",
         )
+        
+        # Debug print right after processing
+        print(f"DEBUG - Processed dataset keys for {name}:", 
+              processed_datasets[name]["train"].features.keys())
+        print(f"DEBUG - Processed first item keys for {name}:", 
+              next(iter(processed_datasets[name]["train"])).keys())
 
     # Combine datasets
     train_datasets = []
@@ -194,17 +247,23 @@ def main():
             eval_datasets.append(processed_datasets[name]["test"])
 
     train_dataset = datasets.concatenate_datasets(train_datasets)
+    # Debug print after concatenation
+    print("DEBUG - After concat keys:", train_dataset.features.keys())
+    print("DEBUG - After concat first item keys:", next(iter(train_dataset)).keys())
+
     eval_dataset = datasets.concatenate_datasets(eval_datasets)
 
     # Data collator
-    data_collator = DataCollatorWithPadding(tokenizer)
+    data_collator = ContrastiveDataCollator(tokenizer)
 
     # Metrics
     metric = evaluate.load("accuracy")
     def compute_metrics(eval_pred):
         predictions, labels = eval_pred
-        predictions = np.argmax(predictions, axis=1)
-        return metric.compute(predictions=predictions, references=labels)
+        # For contrastive learning, predictions are similarity scores
+        # Convert to binary predictions based on threshold (e.g., 0.5)
+        binary_predictions = (predictions > 0.5).astype(int)
+        return metric.compute(predictions=binary_predictions, references=labels)
 
     # Initialize callbacks list
     callbacks = []
@@ -214,6 +273,10 @@ def main():
             early_stopping_threshold=training_args.early_stopping_threshold,
         )
         callbacks.append(early_stopping_callback)
+
+    # Before creating trainer
+    print("DEBUG - Train dataset features:", train_dataset.features)
+    print("DEBUG - Sample from dataset:", next(iter(train_dataset)))
 
     # Initialize ContrastiveTrainer
     trainer = ContrastiveTrainer(
@@ -226,6 +289,10 @@ def main():
         compute_metrics=compute_metrics,
         callbacks=callbacks,
     )
+
+    # After creating trainer
+    print("DEBUG - Trainer dataloader first batch:", 
+          next(iter(trainer.get_train_dataloader())).keys())
 
     # Training
     if training_args.do_train:
