@@ -60,10 +60,10 @@ save_strategy: "steps"
 save_steps: 1000
 save_total_limit: 2
 push_to_hub: true
-hub_model_id: wsklee/distilbert-sentiment-cft-v2
+hub_model_id: wsklee/distilbert-sentiment-cft-v3
 hub_strategy: every_save
 hub_token: null # Will use token from huggingface-cli login
-output_dir: data/distilbert-sentiment-cft-v2
+output_dir: data/distilbert-sentiment-cft-v3
 
 # Reporting
 report_to:

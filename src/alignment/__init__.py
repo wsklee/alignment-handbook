@@ -11,6 +11,7 @@ from .model_utils import (
     get_tokenizer,
     is_adapter_model,
 )
+from .cft import ContrastiveTrainer, InfoNCE, IMDBPreprocess
 
 
 __all__ = [
@@ -28,4 +29,7 @@ __all__ = [
     "get_quantization_config",
     "get_tokenizer",
     "is_adapter_model",
+    "ContrastiveTrainer",
+    "InfoNCE",
+    "IMDBPreprocess",
 ]
