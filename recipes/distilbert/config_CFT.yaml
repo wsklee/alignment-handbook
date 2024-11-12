@@ -27,9 +27,11 @@ peft_lora_modules:
 do_train: true
 do_eval: true
 evaluation_strategy: "steps"
-eval_steps: 500
-metric_for_best_model: "loss"
-greater_is_better: false
+eval_steps: 200
+metric_for_best_model: "eval_accuracy"
+greater_is_better: true
+eval_accumulation_steps: 1 # Add this to control memory usage during eval
+include_inputs_for_metrics: true # Add this to ensure inputs are passed to compute_metrics
 
 num_train_epochs: 4
 max_steps: -1

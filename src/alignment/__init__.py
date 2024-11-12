@@ -12,6 +12,7 @@ from .model_utils import (
     is_adapter_model,
 )
 from .cft import ContrastiveTrainer, InfoNCE, IMDBPreprocess
+from .models import DistilBertCLModel
 
 
 __all__ = [
@@ -32,4 +33,5 @@ __all__ = [
     "ContrastiveTrainer",
     "InfoNCE",
     "IMDBPreprocess",
+    "DistilBertCLModel",
 ]

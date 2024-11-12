@@ -19,6 +19,7 @@ from transformers import (
 )
 import evaluate
 from peft import LoraConfig, get_peft_model, TaskType
+from alignment.models.distilbert_cl import DistilBertCLModel
 
 from alignment.configs import ModelArguments
 
@@ -93,7 +94,7 @@ def main():
     set_seed(training_args.seed)
 
     # Load model
-    model = AutoModel.from_pretrained(
+    model = DistilBertCLModel.from_pretrained(
         model_args.model_name_or_path, 
         trust_remote_code=True,
     )
@@ -128,6 +129,18 @@ def main():
         )
         callbacks.append(early_stopping_callback)
 
+    # Add some debug prints before creating the trainer
+    print("\nDEBUG - Training Arguments:")
+    print(f"evaluation_strategy: {training_args.evaluation_strategy}")
+    print(f"eval_steps: {training_args.eval_steps}")
+    print(f"do_eval: {training_args.do_eval}")
+    print(f"metric_for_best_model: {training_args.metric_for_best_model}")
+
+    # When creating the trainer, verify the eval_dataset is not None
+    print("\nDEBUG - Dataset sizes:")
+    print(f"Train dataset size: {len(train_dataset)}")
+    print(f"Eval dataset size: {len(eval_dataset)}")
+
 
     # Initialize ContrastiveTrainer
     trainer = ContrastiveTrainer(
@@ -139,8 +152,10 @@ def main():
     )
 
     # After creating trainer
-    print("DEBUG - Trainer dataloader first batch:", 
-          next(iter(trainer.get_train_dataloader())).keys())
+    print("DEBUG - First batch from dataloader:")
+    first_batch = next(iter(trainer.get_train_dataloader()))
+    print("Keys:", first_batch.keys())
+    print("Shapes:", {k: v.shape for k, v in first_batch.items()})
 
     # Training
     if training_args.do_train:

@@ -42,13 +42,16 @@ class IMDBPreprocess:
                     padding='max_length', 
                     truncation=True, 
                     return_tensors="pt", 
-                    max_length=512)  # IMDB reviews are longer, so increased max_length
+                    max_length=512)
+        
+        print(f"DEBUG - Tokenizer output for {id}:", {k: v.shape for k, v in out.items()})
         
         out[id + '_input_ids'] = out.pop('input_ids')
         out[id + '_attention_mask'] = out.pop('attention_mask')
         return out
     
     def _preprocess(self):
+        print("DEBUG - Starting preprocessing...")
         # Convert to HF dataset
         self.ds = Dataset.from_list(self.ds)
         
@@ -67,6 +70,8 @@ class IMDBPreprocess:
                      "sent1_input_ids", "sent1_attention_mask",
                      "hard_neg_input_ids", "hard_neg_attention_mask"]
         )
+        print("DEBUG - Final dataset features:", self.ds.features)
+        print("DEBUG - First example:", self.ds[0])
 
 if __name__ == "__main__":
     imdb_prep = IMDBPreprocess()
