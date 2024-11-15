@@ -4,7 +4,8 @@ Repository was forked from [Alignment Handbook](https://github.com/huggingface/a
 
 Code was added to support SFT and CFT training on sentiment analysis tasks on DistilBERT models.
 
-For result analysis, please refer to the report and the google colab notebooks.
+Jupyter notebooks were ran in Google Colab.
+For result analysis, please refer to the report and the jupyter notebooks.
 
 Files added
 
