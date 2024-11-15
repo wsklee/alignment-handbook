@@ -1,37 +1,37 @@
 from datasets import load_dataset, Dataset
 from transformers import AutoTokenizer
 import random
+from tqdm import tqdm
 
 class YelpPreprocess:
     def __init__(self, model_name):
         # Load Yelp Polarity dataset
-        self.ds = load_dataset("fancyzhx/yelp_polarity")['train']
+        self.raw_ds = load_dataset("yelp_polarity", split="train")
         
-        # Load tokenizer from HuggingFace
+        # Load tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
         
-        # Group reviews by sentiment (class 1 is negative, class 2 is positive)
-        self.positive_reviews = [item['text'] for item in self.ds if item['label'] == 2]
-        self.negative_reviews = [item['text'] for item in self.ds if item['label'] == 1]
+        # Split reviews by sentiment
+        self.positive_reviews = self.raw_ds.filter(lambda x: x['label'] == 1)['text']
+        self.negative_reviews = self.raw_ds.filter(lambda x: x['label'] == 0)['text']
         
-        print("\nYelp Dataset Statistics:")
-        print(f"Total samples: {len(self.ds)}")
-        print(f"Positive reviews: {len(self.positive_reviews)}")
-        print(f"Negative reviews: {len(self.negative_reviews)}")
-        
+        # Create pairs and preprocess the dataset
         self._create_pairs()
         self._preprocess()
-    
+
     def _create_pairs(self):
-        """Create positive and negative pairs from Yelp reviews"""
+        """Efficiently create positive and negative pairs"""
         pairs = []
-        for review in self.positive_reviews:
-            # Get another positive review as positive pair
-            pos_candidates = [r for r in self.positive_reviews if r != review]
-            pos_pair = random.choice(pos_candidates)
-            # Get a negative review as hard negative
+        print("DEBUG - Generating pairs...")
+        for review in tqdm(self.positive_reviews):
+            # Randomly sample a positive pair
+            pos_pair = random.choice(self.positive_reviews)
+            while pos_pair == review:  # Ensure it's not the same review
+                pos_pair = random.choice(self.positive_reviews)
+            
+            # Randomly sample a negative review
             hard_neg = random.choice(self.negative_reviews)
             
             pairs.append({
@@ -40,40 +40,56 @@ class YelpPreprocess:
                 'hard_neg': hard_neg
             })
         
-        self.ds = pairs
-    
-    def _tokenize(self, text, id):
-        out = self.tokenizer(text, 
-                    padding='max_length', 
-                    truncation=True, 
-                    return_tensors="pt", 
-                    max_length=512)
-        
-        print(f"DEBUG - Tokenizer output for {id}:", {k: v.shape for k, v in out.items()})
-        
-        out[id + '_input_ids'] = out.pop('input_ids')
-        out[id + '_attention_mask'] = out.pop('attention_mask')
-        return out
-    
+        # Convert to Hugging Face Dataset for efficient processing
+        self.ds = Dataset.from_list(pairs)
+
+    def _tokenize(self, examples, text_column, prefix):
+        """Tokenize a batch of texts and return as a dictionary with prefixed keys"""
+        tokenized = self.tokenizer(
+            examples[text_column],
+            padding="max_length",
+            truncation=True,
+            max_length=256
+        )
+        return {
+            f"{prefix}_input_ids": tokenized['input_ids'],
+            f"{prefix}_attention_mask": tokenized['attention_mask']
+        }
+
     def _preprocess(self):
-        print("DEBUG - Starting preprocessing...")
-        # Convert to HF dataset
-        self.ds = Dataset.from_list(self.ds)
+        """Tokenize dataset and prepare for training"""
+        print("DEBUG - Tokenizing dataset...")
         
-        # Tokenize all texts
+        # Tokenize sent0
         self.ds = self.ds.map(
-            lambda x: self._tokenize(x['sent0'], 'sent0'), batched=True)
+            lambda x: self._tokenize(x, "sent0", "sent0"),
+            batched=True
+        )
+        
+        # Tokenize sent1
         self.ds = self.ds.map(
-            lambda x: self._tokenize(x['sent1'], 'sent1'), batched=True)
+            lambda x: self._tokenize(x, "sent1", "sent1"),
+            batched=True
+        )
+        
+        # Tokenize hard_neg
         self.ds = self.ds.map(
-            lambda x: self._tokenize(x['hard_neg'], 'hard_neg'), batched=True)
+            lambda x: self._tokenize(x, "hard_neg", "hard_neg"),
+            batched=True
+        )
         
         # Set format for training
         self.ds.set_format(
-            type="torch", 
-            columns=["sent0_input_ids", "sent0_attention_mask",
-                     "sent1_input_ids", "sent1_attention_mask",
-                     "hard_neg_input_ids", "hard_neg_attention_mask"]
+            type="torch",
+            columns=[
+                "sent0_input_ids", "sent0_attention_mask",
+                "sent1_input_ids", "sent1_attention_mask",
+                "hard_neg_input_ids", "hard_neg_attention_mask"
+            ]
         )
-        print("DEBUG - Final dataset features:", self.ds.features)
+        print("DEBUG - Dataset tokenized and ready for training.")
         print("DEBUG - First example:", self.ds[0])
+
+if __name__ == "__main__":
+    yelp_prep = YelpPreprocess("distilbert-base-uncased")
+    yelp_prep.ds.save_to_disk("./processed_yelp_dataset")

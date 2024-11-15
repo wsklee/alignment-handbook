@@ -8,10 +8,10 @@ torch_dtype: float16
 dataset_mixer:
   yelp_polarity: 1.0
 preprocessing_num_workers: 4
-max_seq_length: 256
+max_seq_length: 128
 
 # CFT specific settings
-temperature: 0.05 # Temperature parameter for contrastive loss
+temperature: 0.05
 
 # LoRA arguments
 use_peft: true
@@ -35,8 +35,8 @@ include_inputs_for_metrics: true # Add this to ensure inputs are passed to compu
 
 num_train_epochs: 4
 max_steps: -1
-gradient_accumulation_steps: 2
-gradient_checkpointing: false
+gradient_accumulation_steps: 8
+gradient_checkpointing: true
 learning_rate: 0.00003
 weight_decay: 0.02
 logging_steps: 200
@@ -52,8 +52,8 @@ lr_scheduler_type: cosine_with_restarts
 warmup_ratio: 0.1
 
 # Training parameters
-per_device_train_batch_size: 32
-per_device_eval_batch_size: 32
+per_device_train_batch_size: 8
+per_device_eval_batch_size: 8
 remove_unused_columns: false
 seed: 42
 

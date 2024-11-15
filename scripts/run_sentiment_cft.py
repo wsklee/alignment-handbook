@@ -4,8 +4,11 @@
 import logging
 import os
 import sys
+import gc
+import torch
 from dataclasses import dataclass, field
 from typing import Optional, List
+
 
 from transformers import (
     HfArgumentParser,
@@ -115,6 +118,7 @@ def main():
     
     dataset_name = dataset_names[0]
     
+    print("\nDEBUG - Start fetching dataset")
     # Initialize appropriate preprocessor
     if dataset_name == "imdb":
         preprocessor = IMDBPreprocess(model_name=model_args.model_name_or_path)
@@ -124,6 +128,7 @@ def main():
         raise ValueError(f"Unsupported dataset: {dataset_name}. Choose from ['imdb', 'yelp_polarity']")
     
     train_dataset = preprocessor.ds
+    print("\nDEBUG - Fetched dataset")
     
     # Split dataset for evaluation (10% for eval)
     train_test_split = train_dataset.train_test_split(test_size=0.1)
