@@ -87,6 +87,10 @@ def main():
             dataset = load_dataset("imdb")
         elif dataset_name == "sst2":
             dataset = load_dataset("glue", "sst2")
+        elif dataset_name == "yelp_polarity":
+            dataset = load_dataset("yelp_polarity")
+        else:
+            raise ValueError(f"Dataset {dataset_name} not supported. Supported datasets: imdb, sst2, yelp")
         raw_datasets[dataset_name] = dataset
 
     # Load tokenizer

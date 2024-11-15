@@ -10,6 +10,9 @@
 
 set -x -e
 
+# Set wandb project and entity
+export WANDB_PROJECT="cz4042"
+
 # Parse command line arguments
 MODEL=$1       # e.g., distilbert
 TASK=$2        # e.g., sentiment_sft
