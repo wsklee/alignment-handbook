@@ -9,10 +9,8 @@ from typing import Optional, List
 
 import datasets
 import numpy as np
-import torch
 from datasets import load_dataset
 from transformers import (
-    AutoConfig,
     AutoModelForSequenceClassification,
     AutoTokenizer,
     DataCollatorWithPadding,

@@ -9,11 +9,6 @@ class InfoNCE(nn.Module):
         self.device = device
 
     def forward(self, query, pos, neg):
-        '''
-        Use other samples in batch as negative samples.
-        query, pos, neg : [B, E]
-        where B is a batch_size, E is an embedding size
-        '''
         # Normalize
         query = F.normalize(query, dim=-1)
         pos = F.normalize(pos, dim=-1)

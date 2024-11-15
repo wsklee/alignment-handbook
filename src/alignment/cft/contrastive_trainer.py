@@ -7,7 +7,7 @@ from transformers.trainer_utils import EvalLoopOutput
 
 class ContrastiveTrainer(Trainer):
     def __init__(self, *args, **kwargs):
-        # If compute_metrics wasn't passed, use our implementation
+        # If compute_metrics wasn't passed, use own implementation
         if 'compute_metrics' not in kwargs:
             kwargs['compute_metrics'] = self.compute_metrics
         
@@ -69,13 +69,30 @@ class ContrastiveTrainer(Trainer):
         pos_cos_sim = F.cosine_similarity(anchor_embeds, positive_embeds)
         neg_cos_sim = F.cosine_similarity(anchor_embeds, negative_embeds)
         
+        # Calculate predictions (1 for correct ordering, 0 for incorrect)
+        predictions = (pos_cos_sim > neg_cos_sim).float()
+        # Create labels (all should be 1 since positive pairs should always be more similar)
+        labels = torch.ones_like(predictions)
+        
         # Calculate metrics
-        accuracy = (pos_cos_sim > neg_cos_sim).float().mean()
+        accuracy = predictions.mean()
+        
+        # Calculate F1 scores
+        true_positives = (predictions * labels).sum()
+        false_positives = (predictions * (1 - labels)).sum()
+        false_negatives = ((1 - predictions) * labels).sum()
+        
+        precision = true_positives / (true_positives + false_positives + 1e-8)
+        recall = true_positives / (true_positives + false_negatives + 1e-8)
+        f1 = 2 * (precision * recall) / (precision + recall + 1e-8)
         
         metrics = {
             "eval_accuracy": accuracy.item(),
             "eval_pos_similarity": pos_cos_sim.mean().item(),
             "eval_neg_similarity": neg_cos_sim.mean().item(),
+            "eval_f1": f1.item(),
+            "eval_precision": precision.item(),
+            "eval_recall": recall.item()
         }
         
         return metrics

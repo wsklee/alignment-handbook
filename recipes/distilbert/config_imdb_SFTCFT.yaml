@@ -1,7 +1,7 @@
 # Model arguments
-model_name_or_path: distilbert/distilbert-base-uncased
+model_name_or_path: wsklee/distilbert-sentiment-imdb-sft
 model_revision: main
-tokenizer_name_or_path: distilbert/distilbert-base-uncased
+tokenizer_name_or_path: wsklee/distilbert-sentiment-imdb-sft
 torch_dtype: float16
 
 # Data training arguments
@@ -11,13 +11,13 @@ preprocessing_num_workers: 4
 max_seq_length: 256
 
 # CFT specific settings
-temperature: 0.05 # Temperature parameter for contrastive loss
+temperature: 0.07 # Temperature parameter for contrastive loss
 
 # LoRA arguments
 use_peft: true
 peft_lora_r: 8
-peft_lora_alpha: 12
-peft_lora_dropout: 0.3
+peft_lora_alpha: 16
+peft_lora_dropout: 0.2
 peft_lora_modules:
   - q_lin
   - k_lin
@@ -28,22 +28,22 @@ do_train: true
 do_eval: true
 evaluation_strategy: "steps"
 eval_steps: 200
-metric_for_best_model: "eval_accuracy"
+metric_for_best_model: "eval_f1"
 greater_is_better: true
 eval_accumulation_steps: 1 # Add this to control memory usage during eval
 include_inputs_for_metrics: true # Add this to ensure inputs are passed to compute_metrics
 
-num_train_epochs: 4
+num_train_epochs: 5
 max_steps: -1
-gradient_accumulation_steps: 2
+gradient_accumulation_steps: 1
 gradient_checkpointing: false
-learning_rate: 0.00003
-weight_decay: 0.02
+learning_rate: 0.00002
+weight_decay: 0.01
 logging_steps: 200
 
 # Early stopping (added to avoid overfitting)
-early_stopping_patience: 5 # Stop after 3 evaluations without improvement
-early_stopping_threshold: 0.005 # Minimum improvement threshold
+early_stopping_patience: 3
+early_stopping_threshold: 0.01 # Minimum improvement threshold
 load_best_model_at_end: true
 
 # Optimizer settings
@@ -62,10 +62,10 @@ save_strategy: "steps"
 save_steps: 2000
 save_total_limit: 2
 push_to_hub: true
-hub_model_id: wsklee/distilbert-sentiment-cft-v4
+hub_model_id: wsklee/distilbert-sentiment-imdb-sft-cft
 hub_strategy: every_save
 hub_token: null # Will use token from huggingface-cli login
-output_dir: data/distilbert-sentiment-cft-v4
+output_dir: data/distilbert-sentiment-imdb-sft-cft
 
 # Reporting
 report_to:

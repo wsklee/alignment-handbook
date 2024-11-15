@@ -7,17 +7,12 @@ import sys
 from dataclasses import dataclass, field
 from typing import Optional, List
 
-import torch
-from datasets import load_dataset
 from transformers import (
-    AutoModel,
-    AutoTokenizer,
     HfArgumentParser,
     TrainingArguments,
     set_seed,
     EarlyStoppingCallback,
 )
-import evaluate
 from peft import LoraConfig, get_peft_model, TaskType
 from alignment.models.distilbert_cl import DistilBertCLModel
 
@@ -25,6 +20,7 @@ from alignment.configs import ModelArguments
 
 from alignment.cft.contrastive_trainer import ContrastiveTrainer
 from alignment.cft.imdb_preprocess import IMDBPreprocess
+from alignment.cft.yelp_preprocess import YelpPreprocess
 
 logger = logging.getLogger(__name__)
 
@@ -112,9 +108,23 @@ def main():
         model = get_peft_model(model, peft_config)
         model.print_trainable_parameters()
 
-    # Load and preprocess IMDB dataset
-    imdb_preprocessor = IMDBPreprocess(model_name=model_args.model_name_or_path)
-    train_dataset = imdb_preprocessor.ds
+    # Select preprocessor based on dataset_mixer configuration
+    dataset_names = list(data_args.dataset_mixer.keys())
+    if len(dataset_names) != 1:
+        raise ValueError("Currently only supporting one dataset at a time for CFT")
+    
+    dataset_name = dataset_names[0]
+    
+    # Initialize appropriate preprocessor
+    if dataset_name == "imdb":
+        preprocessor = IMDBPreprocess(model_name=model_args.model_name_or_path)
+    elif dataset_name == "yelp_polarity":
+        preprocessor = YelpPreprocess(model_name=model_args.model_name_or_path)
+    else:
+        raise ValueError(f"Unsupported dataset: {dataset_name}. Choose from ['imdb', 'yelp_polarity']")
+    
+    train_dataset = preprocessor.ds
+    
     # Split dataset for evaluation (10% for eval)
     train_test_split = train_dataset.train_test_split(test_size=0.1)
     train_dataset = train_test_split['train']
@@ -129,7 +139,7 @@ def main():
         )
         callbacks.append(early_stopping_callback)
 
-    # Add some debug prints before creating the trainer
+    # Debug prints before creating the trainer
     print("\nDEBUG - Training Arguments:")
     print(f"evaluation_strategy: {training_args.evaluation_strategy}")
     print(f"eval_steps: {training_args.eval_steps}")
